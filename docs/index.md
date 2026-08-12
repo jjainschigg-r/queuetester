@@ -97,5 +97,3 @@ This documentation covers all aspects of administering, using, and contributing 
 - [Glossary](appendix/glossary.md)
 - [Appendix](appendix/index.md)
 - [Contributor's Guide](contrib/index.md)
-
-<!-- pipeline test marker: v1.9.0 rebuild -->
