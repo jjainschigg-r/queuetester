@@ -18,3 +18,7 @@ permissions:
 jobs:
   ci:
     uses: jjainschigg-r/queuetester/.github/workflows/shared-ci.yml@main
+    with:
+      # The branch that triggered this run. Identical text in every branch,
+      # so this file still needs no per-branch maintenance.
+      branch: ${{ github.ref_name }}

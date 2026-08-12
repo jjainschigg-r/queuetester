@@ -5,9 +5,8 @@ on:
     inputs:
       branch:
         description: "Branch whose documentation should be deployed"
-        required: false
+        required: true
         type: string
-        default: ""
 
 # Only one deployment may modify gh-pages at a time.
 # Additional runs wait in GitHub's native queue.
@@ -22,10 +21,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    # If a branch was explicitly supplied, use it.
-    # Otherwise use the branch that triggered the calling workflow.
+    # Every caller supplies the branch explicitly; there is no fallback.
     env:
-      SOURCE_BRANCH: ${{ inputs.branch || github.ref_name }}
+      SOURCE_BRANCH: ${{ inputs.branch }}
 
     steps:
       - name: Validate branch name
