@@ -10,11 +10,10 @@ on:
       - main
       - "release-v*"
 
+# Ceiling for the called workflow's GITHUB_TOKEN. `contents: write` is what lets
+# mike push to gh-pages; everything else drops to `none` implicitly.
 permissions:
   contents: write
-  pages: write
-  id-token: write
-  actions: read
 
 jobs:
   ci:
