@@ -83,34 +83,56 @@ jobs:
           set -euo pipefail
 
           BRANCH="$SOURCE_BRANCH"
+
+          # Titles are always mike's default (the version identifier itself), so
+          # nothing ever has to be relabelled when 'latest' moves. The aliases and
+          # the root redirect are the only things that carry "which one is newest".
+
+          if [[ "$BRANCH" == main ]]; then
+
+            # main is the in-progress docs. It is never a release, never 'latest',
+            # and 'next' cannot match the version pattern below.
+            echo "Deploying $BRANCH as next"
+
+            mike deploy --update-aliases --push next
+
+            exit 0
+
+          fi
+
           VERSION="${BRANCH#release-}"
 
-          echo "Deploying release branch: $BRANCH"
-          echo "Release version: $VERSION"
+          echo "Deploying release branch: $BRANCH as $VERSION"
 
-          echo "Deploying $BRANCH as $VERSION"
+          # 'latest' is decided against what is already published. gh-pages may not
+          # exist yet (mike creates it on first deploy), and there is no local
+          # gh-pages branch before that, so read the remote-tracking ref and treat
+          # anything missing as "nothing published yet".
+          EXISTING_VERSIONS=""
 
-          mike deploy \
-            --title "$VERSION" \
-            --update-aliases \
-            --push \
-            "$VERSION"
+          if git rev-parse --verify --quiet refs/remotes/origin/gh-pages >/dev/null; then
+            EXISTING_VERSIONS="$(
+              git show origin/gh-pages:versions.json 2>/dev/null |
+              jq -r '
+                .[]
+                | .version
+                | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))
+              ' || true
+            )"
+          else
+            echo "No gh-pages branch yet; this deploy will create it."
+          fi
 
-          EXISTING_VERSIONS="$(
-            git show gh-pages:versions.json |
-            jq -r '
-              .[]
-              | .version
-              | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))
-            '
-          )"
-
-          echo "Existing versions:"
+          echo "Published versions:"
           printf '%s\n' "$EXISTING_VERSIONS"
 
+          # Compare against published versions *plus this one*, so the answer is
+          # correct without having to deploy first. Rebuilding an older branch
+          # therefore never steals the aliases, whatever order runs complete in.
           LATEST_VERSION="$(
             {
               printf '%s\n' "$EXISTING_VERSIONS"
+              printf '%s\n' "$VERSION"
             } |
             sed '/^$/d' |
             sort -V |
@@ -122,40 +144,21 @@ jobs:
 
           if [[ "$VERSION" == "$LATEST_VERSION" ]]; then
 
-            echo "Removing old '(latest)' label"
-
-            git worktree add /tmp/gh-pages gh-pages
-
-            sed -i 's/ (latest)//g' /tmp/gh-pages/versions.json
-
-            cd /tmp/gh-pages
-
-            git add versions.json
-
-            if ! git diff --cached --quiet; then
-              git commit -m "Clear old latest label"
-              git push origin gh-pages
-            else
-              echo "No old '(latest)' label found."
-            fi
-
-            cd "$GITHUB_WORKSPACE"
-            git worktree remove /tmp/gh-pages
-
-            # Refresh the local gh-pages branch after the metadata push.
-            git fetch origin gh-pages
-            git branch -f gh-pages origin/gh-pages
-
-            echo "Deploying $BRANCH as latest and stable"
+            echo "Deploying $VERSION as latest and stable"
 
             mike deploy \
-              --title "$VERSION (latest)" \
               --update-aliases \
               --push \
               --alias-type=copy \
               "$VERSION" latest stable
 
             mike set-default --push latest
+
+          else
+
+            echo "$VERSION is not the highest version; deploying without aliases"
+
+            mike deploy --update-aliases --push "$VERSION"
 
           fi
 
